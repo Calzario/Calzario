@@ -346,6 +346,16 @@ db.collection('calzario').doc('movimientos').onSnapshot(doc => {
     </div>
 
     <div class="form-group">
+      <label class="form-label">Precio de venta por docena (12 pares en $COP)</label>
+      <input class="form-input" id="f-precio-docena" placeholder="1680000" type="number" inputmode="numeric"/>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Precio de venta por caja (24 pares en $COP)</label>
+      <input class="form-input" id="f-precio-caja" placeholder="3240000" type="number" inputmode="numeric"/>
+    </div>
+
+    <div class="form-group">
       <label class="form-label">Foto del modelo</label>
       <label for="f-foto-file" style="display:flex;align-items:center;gap:10px;background:var(--card2);border:1px dashed var(--border2);border-radius:var(--radius-sm);padding:14px;cursor:pointer;transition:border-color 0.15s;" id="foto-label">
         <span style="font-size:24px;">📸</span>
@@ -565,6 +575,8 @@ function initAgregarForm() {
   document.getElementById('f-color').value = '';
   document.getElementById('f-costo').value = '';
   document.getElementById('f-precio').value = '';
+  document.getElementById('f-precio-docena').value = '';
+  document.getElementById('f-precio-caja').value = '';
   document.getElementById('codigo-preview').style.display = 'none';
   quitarFoto();
 
@@ -617,6 +629,8 @@ function agregarProducto() {
   const color = document.getElementById('f-color').value;
   const costo = parseFloat(document.getElementById('f-costo').value) || 0;
   const precio = parseFloat(document.getElementById('f-precio').value) || 0;
+  const precioDocena = parseFloat(document.getElementById('f-precio-docena').value) || 0;
+  const precioCaja = parseFloat(document.getElementById('f-precio-caja').value) || 0;
   const foto = fotoBase64;
 
   if (!marca || !nombre || !color) { toast('Completa marca, nombre y color', 'var(--red)'); return; }
@@ -627,7 +641,7 @@ function agregarProducto() {
 
   const { productos, movimientos } = getData();
 
-  const prod = { codigo, marca, nombre, color, costo, precio, foto, tallas, fechaCreacion: new Date().toLocaleDateString('es-CO') };
+  const prod = { codigo, marca, nombre, color, costo, precio, precioDocena, precioCaja, foto, tallas, fechaCreacion: new Date().toLocaleDateString('es-CO') };
   productos.push(prod);
   saveProductos(productos);
 
@@ -703,10 +717,12 @@ function renderInventario() {
           <button class="talla-btn sell" onclick="openModal('venta','${p.codigo}')">📤 Registrar venta</button>
           <button class="talla-btn add" onclick="openModal('entrada','${p.codigo}')">📥 Agregar stock</button>
         </div>
-        ${p.costo || p.precio ? `<div style="display:flex;gap:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        ${p.costo || p.precio || p.precioDocena || p.precioCaja ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
           ${p.costo ? `<div style="font-size:12px;color:var(--text3);">Costo: <span style="color:var(--text2);font-weight:600;">${fmt(p.costo)}</span></div>` : ''}
-          ${p.precio ? `<div style="font-size:12px;color:var(--text3);">Venta: <span style="color:var(--green-text);font-weight:600;">${fmt(p.precio)}</span></div>` : ''}
-          ${p.costo && p.precio ? `<div style="font-size:12px;color:var(--text3);">Margen: <span style="color:var(--amber-text);font-weight:600;">${fmt(p.precio-p.costo)}</span></div>` : ''}
+          ${p.precio ? `<div style="font-size:12px;color:var(--text3);">Mayor: <span style="color:var(--green-text);font-weight:600;">${fmt(p.precio)}</span></div>` : ''}
+          ${p.precioDocena ? `<div style="font-size:12px;color:var(--text3);">Docena: <span style="color:var(--amber-text);font-weight:600;">${fmt(p.precioDocena)}</span></div>` : ''}
+          ${p.precioCaja ? `<div style="font-size:12px;color:var(--text3);">Caja 24: <span style="color:var(--purple-text);font-weight:600;">${fmt(p.precioCaja)}</span></div>` : ''}
+          ${p.costo && p.precio ? `<div style="font-size:12px;color:var(--text3);">Margen: <span style="color:var(--blue-text);font-weight:600;">${fmt(p.precio-p.costo)}</span></div>` : ''}
         </div>` : ''}
       </div>
     </div>`;
