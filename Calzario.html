@@ -472,6 +472,67 @@ db.collection('calzario').doc('movimientos').onSnapshot(doc => {
   </div>
 </div>
 
+<!-- Modal editar referencia -->
+<div class="modal" id="modal-editar">
+  <div class="modal-content">
+    <div class="modal-title">
+      <span>✏️ Editar referencia</span>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Marca</label>
+      <select class="form-input" id="e-marca">
+        <option value="Nike">Nike</option>
+        <option value="Adidas">Adidas</option>
+        <option value="Puma">Puma</option>
+        <option value="New Balance">New Balance</option>
+        <option value="Umbro">Umbro</option>
+        <option value="Joma">Joma</option>
+        <option value="Mizuno">Mizuno</option>
+        <option value="Skechers">Skechers</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nombre del modelo</label>
+      <input class="form-input" id="e-nombre" type="text" placeholder="Ej: Phantom GX, F50 Yamal..."/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Color principal</label>
+      <select class="form-input" id="e-color">
+        <option value="Negro">Negro</option>
+        <option value="Blanco">Blanco</option>
+        <option value="Rojo">Rojo</option>
+        <option value="Azul">Azul</option>
+        <option value="Verde">Verde</option>
+        <option value="Amarillo">Amarillo</option>
+        <option value="Naranja">Naranja</option>
+        <option value="Gris">Gris</option>
+        <option value="Morado">Morado</option>
+        <option value="Multicolor">Multicolor</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Precio de costo por par ($COP)</label>
+      <input class="form-input" id="e-costo" type="number" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Precio venta por mayor ($COP)</label>
+      <input class="form-input" id="e-precio" type="number" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Precio venta por docena ($COP)</label>
+      <input class="form-input" id="e-precio-docena" type="number" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Precio venta por caja 24 pares ($COP)</label>
+      <input class="form-input" id="e-precio-caja" type="number" inputmode="numeric" placeholder="0"/>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">El código y las tallas no cambian. Solo la información del modelo.</div>
+    <button class="btn-primary" onclick="guardarEdicion()" style="background:var(--purple);">Guardar cambios</button>
+    <button class="btn-secondary" style="margin-top:8px;background:var(--red-bg);border-color:var(--red-bg);color:var(--red-text);" onclick="eliminarProducto()">🗑️ Eliminar referencia</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -623,7 +684,7 @@ function quitarFoto() {
 }
 
 // ── AGREGAR PRODUCTO ───────────────────────────────────────
-function agregarProducto() {
+async function agregarProducto() {
   const marca = document.getElementById('f-marca').value;
   const nombre = document.getElementById('f-nombre').value.trim();
   const color = document.getElementById('f-color').value;
@@ -639,21 +700,141 @@ function agregarProducto() {
   const tallas = {};
   TALLAS.forEach(t => { tallas[t] = parseInt(document.getElementById('ti-'+t).value) || 0; });
 
-  const { productos, movimientos } = getData();
-
   const prod = { codigo, marca, nombre, color, costo, precio, precioDocena, precioCaja, foto, tallas, fechaCreacion: new Date().toLocaleDateString('es-CO') };
-  productos.push(prod);
-  saveProductos(productos);
 
-  const totalIn = stockTotal(prod);
-  if (totalIn > 0) {
-    movimientos.unshift({ tipo:'entrada', codigo, nombre:`${marca} ${nombre}`, color, pares: totalIn, fecha: new Date().toLocaleDateString('es-CO'), hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}) });
-    saveMovimientos(movimientos);
+  // Leer productos frescos de Firebase antes de guardar
+  setSyncStatus('saving');
+  try {
+    const docRef = db.collection('calzario').doc('productos');
+    const snap = await docRef.get();
+    const productosActuales = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    productosActuales.push(prod);
+    await docRef.set({ data: JSON.stringify(productosActuales) });
+    window._productos = productosActuales;
+
+    const totalIn = stockTotal(prod);
+    if (totalIn > 0) {
+      const movRef = db.collection('calzario').doc('movimientos');
+      const movSnap = await movRef.get();
+      const movsActuales = (movSnap.exists && movSnap.data().data) ? JSON.parse(movSnap.data().data) : [];
+      movsActuales.unshift({ tipo:'entrada', codigo, nombre:`${marca} ${nombre}`, color, pares: totalIn, fecha: new Date().toLocaleDateString('es-CO'), hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}) });
+      await movRef.set({ data: JSON.stringify(movsActuales) });
+      window._movimientos = movsActuales;
+    }
+
+    setSyncStatus('ok');
+    toast('Referencia guardada ✓');
+    showSection('inventario');
+    document.querySelector('.nav-btn').classList.add('active');
+  } catch(e) {
+    setSyncStatus('offline');
+    toast('Error al guardar. Verifica conexión.', 'var(--red)');
   }
+}
 
-  toast('Referencia guardada ✓');
-  showSection('inventario');
-  document.querySelector('.nav-btn').classList.add('active');
+// ── EDITAR PRODUCTO ────────────────────────────────────────
+function abrirEditar(codigo) {
+  const { productos } = getData();
+  const prod = productos.find(p => p.codigo === codigo);
+  if (!prod) return;
+
+  document.getElementById('modal-title-text').textContent = '✏️ Editar referencia';
+  const body = document.getElementById('modal-body');
+
+  body.innerHTML = `
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px;font-family:monospace;">${prod.codigo}</div>
+    <div class="form-group">
+      <label class="form-label">Marca</label>
+      <select class="form-input" id="edit-marca">
+        ${['Nike','Adidas','Puma','New Balance','Umbro','Joma','Mizuno','Skechers'].map(m =>
+          `<option value="${m}" ${prod.marca === m ? 'selected' : ''}>${m}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Nombre del modelo</label>
+      <input class="form-input" id="edit-nombre" type="text" value="${prod.nombre}"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Color</label>
+      <select class="form-input" id="edit-color">
+        ${['Negro','Blanco','Rojo','Azul','Verde','Amarillo','Naranja','Gris','Morado','Multicolor'].map(c =>
+          `<option value="${c}" ${prod.color === c ? 'selected' : ''}>${c}</option>`
+        ).join('')}
+      </select>
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label class="form-label">Costo por par ($)</label>
+        <input class="form-input" id="edit-costo" type="number" inputmode="numeric" value="${prod.costo || ''}"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio mayor ($)</label>
+        <input class="form-input" id="edit-precio" type="number" inputmode="numeric" value="${prod.precio || ''}"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio docena ($)</label>
+        <input class="form-input" id="edit-docena" type="number" inputmode="numeric" value="${prod.precioDocena || ''}"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Precio caja 24 ($)</label>
+        <input class="form-input" id="edit-caja" type="number" inputmode="numeric" value="${prod.precioCaja || ''}"/>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="guardarEdicion('${codigo}')">Guardar cambios</button>
+    <button class="btn-secondary" style="margin-top:8px;background:var(--red-bg);border-color:var(--red-bg);color:var(--red-text);" onclick="eliminarProducto('${codigo}')">Eliminar referencia</button>
+  `;
+
+  document.getElementById('modal-movimiento').classList.add('open');
+}
+
+async function guardarEdicion(codigo) {
+  const marca = document.getElementById('edit-marca').value;
+  const nombre = document.getElementById('edit-nombre').value.trim();
+  const color = document.getElementById('edit-color').value;
+  const costo = parseFloat(document.getElementById('edit-costo').value) || 0;
+  const precio = parseFloat(document.getElementById('edit-precio').value) || 0;
+  const precioDocena = parseFloat(document.getElementById('edit-docena').value) || 0;
+  const precioCaja = parseFloat(document.getElementById('edit-caja').value) || 0;
+
+  if (!nombre) { toast('El nombre no puede estar vacío', 'var(--red)'); return; }
+
+  setSyncStatus('saving');
+  try {
+    const docRef = db.collection('calzario').doc('productos');
+    const snap = await docRef.get();
+    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    const idx = productos.findIndex(p => p.codigo === codigo);
+    if (idx === -1) { toast('Referencia no encontrada', 'var(--red)'); return; }
+    productos[idx] = { ...productos[idx], marca, nombre, color, costo, precio, precioDocena, precioCaja };
+    await docRef.set({ data: JSON.stringify(productos) });
+    window._productos = productos;
+    setSyncStatus('ok');
+    closeModal();
+    toast('Referencia actualizada ✓');
+  } catch(e) {
+    setSyncStatus('offline');
+    toast('Error al guardar', 'var(--red)');
+  }
+}
+
+async function eliminarProducto(codigo) {
+  if (!confirm('¿Eliminar esta referencia del inventario?')) return;
+  setSyncStatus('saving');
+  try {
+    const docRef = db.collection('calzario').doc('productos');
+    const snap = await docRef.get();
+    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    const nuevos = productos.filter(p => p.codigo !== codigo);
+    await docRef.set({ data: JSON.stringify(nuevos) });
+    window._productos = nuevos;
+    setSyncStatus('ok');
+    closeModal();
+    toast('Referencia eliminada');
+  } catch(e) {
+    setSyncStatus('offline');
+    toast('Error al eliminar', 'var(--red)');
+  }
 }
 
 // ── RENDER INVENTARIO ──────────────────────────────────────
@@ -716,6 +897,7 @@ function renderInventario() {
         <div class="talla-actions">
           <button class="talla-btn sell" onclick="openModal('venta','${p.codigo}')">📤 Registrar venta</button>
           <button class="talla-btn add" onclick="openModal('entrada','${p.codigo}')">📥 Agregar stock</button>
+          <button class="talla-btn" onclick="abrirEditar('${p.codigo}')" style="background:var(--purple-bg);border-color:rgba(124,92,252,0.2);color:var(--purple-text);">✏️ Editar</button>
         </div>
         ${p.costo || p.precio || p.precioDocena || p.precioCaja ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
           ${p.costo ? `<div style="font-size:12px;color:var(--text3);">Costo: <span style="color:var(--text2);font-weight:600;">${fmt(p.costo)}</span></div>` : ''}
@@ -798,7 +980,7 @@ function recalcTotal() {
   if (btn) btn.disabled = total === 0;
 }
 
-function confirmarMovimiento() {
+async function confirmarMovimiento() {
   const { tipo, codigo } = modalData;
 
   const cantidadesPorTalla = {};
@@ -810,57 +992,62 @@ function confirmarMovimiento() {
 
   if (totalPares === 0) { toast('Agrega al menos 1 par', 'var(--amber)'); return; }
 
-  const { productos, movimientos } = getData();
-  const idx = productos.findIndex(p => p.codigo === codigo);
-  if (idx === -1) return;
+  setSyncStatus('saving');
+  try {
+    const prodRef = db.collection('calzario').doc('productos');
+    const snap = await prodRef.get();
+    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
+    const idx = productos.findIndex(p => p.codigo === codigo);
+    if (idx === -1) { toast('Referencia no encontrada', 'var(--red)'); return; }
 
-  const prod = productos[idx];
+    const prod = productos[idx];
 
-  // Validar stock en venta
-  if (tipo === 'venta') {
-    for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
-      const stockActual = prod.tallas[t] || 0;
-      if (cant > stockActual) {
-        toast(`Solo hay ${stockActual} pares en talla EUR ${t}`, 'var(--red)');
-        return;
+    if (tipo === 'venta') {
+      for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
+        const stockActual = prod.tallas[t] || 0;
+        if (cant > stockActual) { toast(`Solo hay ${stockActual} pares en talla EUR ${t}`, 'var(--red)'); setSyncStatus('ok'); return; }
       }
     }
-  }
 
-  // Aplicar cambios
-  for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
-    if (tipo === 'venta') {
-      prod.tallas[t] = (prod.tallas[t] || 0) - cant;
-    } else {
-      prod.tallas[t] = (prod.tallas[t] || 0) + cant;
+    for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
+      prod.tallas[t] = tipo === 'venta'
+        ? (prod.tallas[t] || 0) - cant
+        : (prod.tallas[t] || 0) + cant;
     }
+
+    productos[idx] = prod;
+    await prodRef.set({ data: JSON.stringify(productos) });
+    window._productos = productos;
+
+    const tallasDetalle = Object.entries(cantidadesPorTalla).map(([t,c]) => `${c}×${t}`).join(', ');
+    const movRef = db.collection('calzario').doc('movimientos');
+    const movSnap = await movRef.get();
+    const movimientos = (movSnap.exists && movSnap.data().data) ? JSON.parse(movSnap.data().data) : [];
+    movimientos.unshift({
+      tipo, codigo,
+      nombre: `${prod.marca} ${prod.nombre}`,
+      color: prod.color,
+      talla: tallasDetalle,
+      pares: totalPares,
+      fecha: new Date().toLocaleDateString('es-CO'),
+      hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})
+    });
+    await movRef.set({ data: JSON.stringify(movimientos) });
+    window._movimientos = movimientos;
+
+    setSyncStatus('ok');
+    closeModal();
+    toast(
+      tipo === 'venta'
+        ? `Venta registrada · ${totalPares} par(es) · ${tallasDetalle}`
+        : `Stock agregado · ${totalPares} par(es) · ${tallasDetalle}`,
+      tipo === 'venta' ? 'var(--green)' : 'var(--blue)'
+    );
+    renderInventario();
+  } catch(e) {
+    setSyncStatus('offline');
+    toast('Error al guardar. Verifica conexión.', 'var(--red)');
   }
-
-  productos[idx] = prod;
-  saveProductos(productos);
-
-  // Registrar movimiento con detalle de tallas
-  const tallasDetalle = Object.entries(cantidadesPorTalla).map(([t,c]) => `${c}×${t}`).join(', ');
-  movimientos.unshift({
-    tipo,
-    codigo,
-    nombre: `${prod.marca} ${prod.nombre}`,
-    color: prod.color,
-    talla: tallasDetalle,
-    pares: totalPares,
-    fecha: new Date().toLocaleDateString('es-CO'),
-    hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})
-  });
-  saveMovimientos(movimientos);
-
-  closeModal();
-  toast(
-    tipo === 'venta'
-      ? `Venta registrada · ${totalPares} par(es) · ${tallasDetalle}`
-      : `Stock agregado · ${totalPares} par(es) · ${tallasDetalle}`,
-    tipo === 'venta' ? 'var(--green)' : 'var(--blue)'
-  );
-  renderInventario();
 }
 
 function closeModal() {
