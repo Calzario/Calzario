@@ -213,29 +213,17 @@ function getData() {
   return { productos: window._productos, movimientos: window._movimientos };
 }
 
-function saveProductos(productos) {
-  window._productos = productos;
-  setSyncStatus('saving');
-  db.collection('calzario').doc('productos').set({ data: JSON.stringify(productos) })
-    .then(() => setSyncStatus('ok')).catch(() => setSyncStatus('offline'));
-}
-
-function saveMovimientos(movimientos) {
-  window._movimientos = movimientos;
-  setSyncStatus('saving');
-  db.collection('calzario').doc('movimientos').set({ data: JSON.stringify(movimientos) })
-    .then(() => setSyncStatus('ok')).catch(() => setSyncStatus('offline'));
-}
-
-db.collection('calzario').doc('productos').onSnapshot(doc => {
-  window._productos = (doc.exists && doc.data().data) ? JSON.parse(doc.data().data) : [];
+// ── LISTENER DE PRODUCTOS (uno por documento) ──────────────
+db.collection('productos').onSnapshot(snap => {
+  window._productos = snap.docs.map(d => d.data());
   if (typeof renderInventario === 'function') renderInventario();
   if (typeof updateHeader === 'function') updateHeader();
   setSyncStatus('ok');
 }, () => setSyncStatus('offline'));
 
-db.collection('calzario').doc('movimientos').onSnapshot(doc => {
-  window._movimientos = (doc.exists && doc.data().data) ? JSON.parse(doc.data().data) : [];
+// ── LISTENER DE MOVIMIENTOS ────────────────────────────────
+db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap => {
+  window._movimientos = snap.docs.map(d => d.data());
   const sec = document.getElementById('sec-movimientos');
   if (sec && sec.classList.contains('active') && typeof renderMovimientos === 'function') renderMovimientos();
   setSyncStatus('ok');
@@ -702,24 +690,18 @@ async function agregarProducto() {
 
   const prod = { codigo, marca, nombre, color, costo, precio, precioDocena, precioCaja, foto, tallas, fechaCreacion: new Date().toLocaleDateString('es-CO') };
 
-  // Leer productos frescos de Firebase antes de guardar
   setSyncStatus('saving');
   try {
-    const docRef = db.collection('calzario').doc('productos');
-    const snap = await docRef.get();
-    const productosActuales = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
-    productosActuales.push(prod);
-    await docRef.set({ data: JSON.stringify(productosActuales) });
-    window._productos = productosActuales;
+    // Cada producto en su propio documento (evita límite 1MB de Firestore)
+    await db.collection('productos').doc(codigo).set(prod);
 
     const totalIn = stockTotal(prod);
     if (totalIn > 0) {
-      const movRef = db.collection('calzario').doc('movimientos');
-      const movSnap = await movRef.get();
-      const movsActuales = (movSnap.exists && movSnap.data().data) ? JSON.parse(movSnap.data().data) : [];
-      movsActuales.unshift({ tipo:'entrada', codigo, nombre:`${marca} ${nombre}`, color, pares: totalIn, fecha: new Date().toLocaleDateString('es-CO'), hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}) });
-      await movRef.set({ data: JSON.stringify(movsActuales) });
-      window._movimientos = movsActuales;
+      const mov = { tipo:'entrada', codigo, nombre:`${marca} ${nombre}`, color, pares: totalIn,
+        fecha: new Date().toLocaleDateString('es-CO'),
+        hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}),
+        ts: Date.now() };
+      await db.collection('movimientos').add(mov);
     }
 
     setSyncStatus('ok');
@@ -727,8 +709,9 @@ async function agregarProducto() {
     showSection('inventario');
     document.querySelector('.nav-btn').classList.add('active');
   } catch(e) {
+    console.error('Error agregar:', e);
     setSyncStatus('offline');
-    toast('Error al guardar. Verifica conexión.', 'var(--red)');
+    toast('Error: ' + e.message, 'var(--red)');
   }
 }
 
@@ -801,20 +784,14 @@ async function guardarEdicion(codigo) {
 
   setSyncStatus('saving');
   try {
-    const docRef = db.collection('calzario').doc('productos');
-    const snap = await docRef.get();
-    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
-    const idx = productos.findIndex(p => p.codigo === codigo);
-    if (idx === -1) { toast('Referencia no encontrada', 'var(--red)'); return; }
-    productos[idx] = { ...productos[idx], marca, nombre, color, costo, precio, precioDocena, precioCaja };
-    await docRef.set({ data: JSON.stringify(productos) });
-    window._productos = productos;
+    await db.collection('productos').doc(codigo).update({ marca, nombre, color, costo, precio, precioDocena, precioCaja });
     setSyncStatus('ok');
     closeModal();
     toast('Referencia actualizada ✓');
   } catch(e) {
+    console.error('Error editar:', e);
     setSyncStatus('offline');
-    toast('Error al guardar', 'var(--red)');
+    toast('Error al guardar: ' + e.message, 'var(--red)');
   }
 }
 
@@ -822,18 +799,13 @@ async function eliminarProducto(codigo) {
   if (!confirm('¿Eliminar esta referencia del inventario?')) return;
   setSyncStatus('saving');
   try {
-    const docRef = db.collection('calzario').doc('productos');
-    const snap = await docRef.get();
-    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
-    const nuevos = productos.filter(p => p.codigo !== codigo);
-    await docRef.set({ data: JSON.stringify(nuevos) });
-    window._productos = nuevos;
+    await db.collection('productos').doc(codigo).delete();
     setSyncStatus('ok');
     closeModal();
     toast('Referencia eliminada');
   } catch(e) {
     setSyncStatus('offline');
-    toast('Error al eliminar', 'var(--red)');
+    toast('Error al eliminar: ' + e.message, 'var(--red)');
   }
 }
 
@@ -994,13 +966,10 @@ async function confirmarMovimiento() {
 
   setSyncStatus('saving');
   try {
-    const prodRef = db.collection('calzario').doc('productos');
+    const prodRef = db.collection('productos').doc(codigo);
     const snap = await prodRef.get();
-    const productos = (snap.exists && snap.data().data) ? JSON.parse(snap.data().data) : [];
-    const idx = productos.findIndex(p => p.codigo === codigo);
-    if (idx === -1) { toast('Referencia no encontrada', 'var(--red)'); return; }
-
-    const prod = productos[idx];
+    if (!snap.exists) { toast('Referencia no encontrada', 'var(--red)'); return; }
+    const prod = snap.data();
 
     if (tipo === 'venta') {
       for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
@@ -1009,31 +978,26 @@ async function confirmarMovimiento() {
       }
     }
 
+    const nuevasTallas = { ...prod.tallas };
     for (const [t, cant] of Object.entries(cantidadesPorTalla)) {
-      prod.tallas[t] = tipo === 'venta'
-        ? (prod.tallas[t] || 0) - cant
-        : (prod.tallas[t] || 0) + cant;
+      nuevasTallas[t] = tipo === 'venta'
+        ? (nuevasTallas[t] || 0) - cant
+        : (nuevasTallas[t] || 0) + cant;
     }
 
-    productos[idx] = prod;
-    await prodRef.set({ data: JSON.stringify(productos) });
-    window._productos = productos;
+    await prodRef.update({ tallas: nuevasTallas });
 
     const tallasDetalle = Object.entries(cantidadesPorTalla).map(([t,c]) => `${c}×${t}`).join(', ');
-    const movRef = db.collection('calzario').doc('movimientos');
-    const movSnap = await movRef.get();
-    const movimientos = (movSnap.exists && movSnap.data().data) ? JSON.parse(movSnap.data().data) : [];
-    movimientos.unshift({
+    await db.collection('movimientos').add({
       tipo, codigo,
       nombre: `${prod.marca} ${prod.nombre}`,
       color: prod.color,
       talla: tallasDetalle,
       pares: totalPares,
       fecha: new Date().toLocaleDateString('es-CO'),
-      hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})
+      hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}),
+      ts: Date.now()
     });
-    await movRef.set({ data: JSON.stringify(movimientos) });
-    window._movimientos = movimientos;
 
     setSyncStatus('ok');
     closeModal();
