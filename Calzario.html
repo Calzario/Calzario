@@ -250,18 +250,38 @@ function cerrarSesion() {
   auth.signOut();
 }
 
+const ADMIN_EMAIL = 'kickzonespor@gmail.com';
+let esAdmin = false;
+
 auth.onAuthStateChanged(user => {
   const loginScreen = document.getElementById('login-screen');
   if (user) {
     loginScreen.style.display = 'none';
+    esAdmin = user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     document.getElementById('user-email').textContent = user.email.split('@')[0];
+    document.getElementById('rol-badge').textContent = esAdmin ? '👑 Admin' : '👤 Vendedor';
     iniciarListeners();
+    aplicarPermisos();
   } else {
     loginScreen.style.display = 'flex';
+    esAdmin = false;
     document.getElementById('login-btn').textContent = 'Ingresar';
     document.getElementById('login-btn').disabled = false;
   }
 });
+
+function aplicarPermisos() {
+  // Ocultar nav de Agregar para no admins
+  const navBtns = document.querySelectorAll('.nav-btn');
+  navBtns.forEach(btn => {
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('agregar')) {
+      btn.style.display = esAdmin ? 'flex' : 'none';
+    }
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('alertas')) {
+      btn.style.display = esAdmin ? 'flex' : 'none';
+    }
+  });
+}
 
 let listenersActivos = false;
 function iniciarListeners() {
@@ -332,7 +352,7 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
     </div>
     <div class="hstat" style="cursor:pointer;" onclick="if(confirm('¿Cerrar sesión?'))cerrarSesion()">
       <div class="hstat-val" id="user-email" style="font-size:12px;">—</div>
-      <div class="hstat-lab">salir</div>
+      <div class="hstat-lab" id="rol-badge">salir</div>
     </div>
   </div>
 </div>
@@ -983,6 +1003,7 @@ function openModal(tipo, codigo) {
   if (!prod) return;
   modalData = { tipo, codigo };
 
+  if (tipo === 'entrada' && !esAdmin) { toast('Solo el administrador puede agregar stock', 'var(--red)'); return; }
   document.getElementById('modal-title-text').textContent = tipo === 'venta' ? '📤 Registrar venta' : '📥 Agregar stock';
 
   const body = document.getElementById('modal-body');
