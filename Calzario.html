@@ -250,6 +250,28 @@ function cerrarSesion() {
   auth.signOut();
 }
 
+// ── NOTIFICACIONES DEL NAVEGADOR ─────────────────────────
+async function pedirPermisoNotificaciones() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+}
+
+function notificarNavegador(titulo, cuerpo, icono) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const notif = new Notification(titulo, {
+    body: cuerpo,
+    icon: icono || 'https://calzario.github.io/Calzario/Calzario.html',
+    badge: icono,
+    tag: 'calzario-venta-' + Date.now(),
+    requireInteraction: true
+  });
+  notif.onclick = () => { window.focus(); notif.close(); };
+  setTimeout(() => notif.close(), 15000);
+}
+
 // ── NOTIFICACIONES TELEGRAM ───────────────────────────────
 const TG_TOKEN = '8782894071:AAEkcgla7_IhUO_RCvzG_2t_X5DN_ij_PIM';
 const TG_CHAT = '8012182112';
@@ -282,6 +304,7 @@ auth.onAuthStateChanged(user => {
     document.getElementById('rol-badge').textContent = esAdmin ? '👑 Admin' : '👤 Vendedor';
     iniciarListeners();
     aplicarPermisos();
+    if (esAdmin) pedirPermisoNotificaciones();
   } else {
     loginScreen.style.display = 'flex';
     esAdmin = false;
@@ -832,7 +855,7 @@ async function agregarProducto() {
     setSyncStatus('ok');
     toast('Referencia guardada ✓');
 
-    // Notificar Telegram nueva referencia
+    // Notificar nueva referencia
     const totalStock = stockTotal(prod);
     if (totalStock > 0) {
       const msg = `📦 <b>Nueva referencia agregada</b>\n\n` +
@@ -841,6 +864,11 @@ async function agregarProducto() {
         `📊 <b>Stock inicial:</b> ${totalStock} pares\n` +
         `💰 <b>Mayor:</b> $${precio.toLocaleString('es-CO')} · <b>Docena:</b> $${precioDocena.toLocaleString('es-CO')}`;
       notificarTelegram(msg);
+      notificarNavegador(
+        `📦 Nueva referencia agregada`,
+        `${marca} ${nombre} · ${color}\nRef: ${codigo} · Stock: ${totalStock} pares`,
+        null
+      );
     }
 
     showSection('inventario');
@@ -1146,16 +1174,27 @@ async function confirmarMovimiento() {
       usuarioNombre: userName
     });
 
-    // Notificación Telegram solo en ventas
+    // Notificaciones en ventas
     if (tipo === 'venta') {
+      const hora = new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'});
+      const fecha = new Date().toLocaleDateString('es-CO');
+
+      // Telegram
       const msg = `🔔 <b>Nueva venta registrada</b>\n\n` +
         `👤 <b>Vendedor:</b> ${userName} (${userEmail})\n` +
         `📦 <b>Modelo:</b> ${prod.marca} ${prod.nombre} · ${prod.color}\n` +
         `🏷️ <b>Ref:</b> ${codigo}\n` +
         `👟 <b>Tallas:</b> ${tallasDetalle}\n` +
         `📊 <b>Total pares:</b> ${totalPares}\n` +
-        `🕐 <b>Hora:</b> ${new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})}`;
+        `🕐 <b>Hora:</b> ${hora}`;
       notificarTelegram(msg);
+
+      // Notificación del navegador (solo llega al admin)
+      notificarNavegador(
+        `⚽ Venta registrada · ${totalPares} pares`,
+        `${prod.marca} ${prod.nombre} · ${prod.color}\nTallas: ${tallasDetalle}\nVendedor: ${userName}\n${fecha} ${hora}`,
+        null
+      );
     }
 
     setSyncStatus('ok');
