@@ -250,6 +250,26 @@ function cerrarSesion() {
   auth.signOut();
 }
 
+// ── NOTIFICACIONES TELEGRAM ───────────────────────────────
+const TG_TOKEN = '8782894071:AAEkcgla7_IhUO_RCvzG_2t_X5DN_ij_PIM';
+const TG_CHAT = '8012182112';
+
+async function notificarTelegram(mensaje) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TG_CHAT,
+        text: mensaje,
+        parse_mode: 'HTML'
+      })
+    });
+  } catch(e) {
+    console.log('Telegram error:', e);
+  }
+}
+
 const ADMIN_EMAIL = 'kickzonespor@gmail.com';
 let esAdmin = false;
 
@@ -810,6 +830,18 @@ async function agregarProducto() {
 
     setSyncStatus('ok');
     toast('Referencia guardada ✓');
+
+    // Notificar Telegram nueva referencia
+    const totalStock = stockTotal(prod);
+    if (totalStock > 0) {
+      const msg = `📦 <b>Nueva referencia agregada</b>\n\n` +
+        `🏷️ <b>Ref:</b> ${codigo}\n` +
+        `👟 <b>Modelo:</b> ${marca} ${nombre} · ${color}\n` +
+        `📊 <b>Stock inicial:</b> ${totalStock} pares\n` +
+        `💰 <b>Mayor:</b> $${precio.toLocaleString('es-CO')} · <b>Docena:</b> $${precioDocena.toLocaleString('es-CO')}`;
+      notificarTelegram(msg);
+    }
+
     showSection('inventario');
     document.querySelector('.nav-btn').classList.add('active');
   } catch(e) {
@@ -1093,6 +1125,10 @@ async function confirmarMovimiento() {
     await prodRef.update({ tallas: nuevasTallas });
 
     const tallasDetalle = Object.entries(cantidadesPorTalla).map(([t,c]) => `${c}×${t}`).join(', ');
+    const currentUser = auth.currentUser;
+    const userEmail = currentUser ? currentUser.email : 'desconocido';
+    const userName = userEmail.split('@')[0];
+
     await db.collection('movimientos').add({
       tipo, codigo,
       nombre: `${prod.marca} ${prod.nombre}`,
@@ -1101,8 +1137,22 @@ async function confirmarMovimiento() {
       pares: totalPares,
       fecha: new Date().toLocaleDateString('es-CO'),
       hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}),
-      ts: Date.now()
+      ts: Date.now(),
+      usuario: userEmail,
+      usuarioNombre: userName
     });
+
+    // Notificación Telegram solo en ventas
+    if (tipo === 'venta') {
+      const msg = `🔔 <b>Nueva venta registrada</b>\n\n` +
+        `👤 <b>Vendedor:</b> ${userName} (${userEmail})\n` +
+        `📦 <b>Modelo:</b> ${prod.marca} ${prod.nombre} · ${prod.color}\n` +
+        `🏷️ <b>Ref:</b> ${codigo}\n` +
+        `👟 <b>Tallas:</b> ${tallasDetalle}\n` +
+        `📊 <b>Total pares:</b> ${totalPares}\n` +
+        `🕐 <b>Hora:</b> ${new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'})}`;
+      notificarTelegram(msg);
+    }
 
     setSyncStatus('ok');
     closeModal();
@@ -1200,6 +1250,7 @@ function renderMovimientos() {
         <div class="mov-info">
           <div class="mov-name">${m.nombre} · ${m.color}</div>
           <div class="mov-detail">${m.fecha} ${m.hora || ''} ${m.talla ? '· ' + m.talla : ''} · Ref: ${m.codigo}</div>
+          ${m.usuarioNombre ? `<div style="font-size:11px;color:var(--purple-text);margin-top:2px;font-weight:600;">👤 ${m.usuarioNombre}</div>` : ''}
         </div>
         <div class="mov-amount ${tipo === 'venta' ? 'out' : 'in'}">${tipo === 'venta' ? '-' : '+'}${m.pares}p</div>
       </div>
