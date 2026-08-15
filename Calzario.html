@@ -797,6 +797,7 @@ function quitarFoto() {
 
 // ── AGREGAR PRODUCTO ───────────────────────────────────────
 async function agregarProducto() {
+  if (!esAdmin) { toast('Solo el administrador puede agregar referencias', 'var(--red)'); return; }
   const marca = document.getElementById('f-marca').value;
   const nombre = document.getElementById('f-nombre').value.trim();
   const color = document.getElementById('f-color').value;
@@ -853,6 +854,7 @@ async function agregarProducto() {
 
 // ── EDITAR PRODUCTO ────────────────────────────────────────
 function abrirEditar(codigo) {
+  if (!esAdmin) { toast('Solo el administrador puede editar referencias', 'var(--red)'); return; }
   const { productos } = getData();
   const prod = productos.find(p => p.codigo === codigo);
   if (!prod) return;
@@ -908,6 +910,7 @@ function abrirEditar(codigo) {
 }
 
 async function guardarEdicion(codigo) {
+  if (!esAdmin) { toast('Solo el administrador puede editar referencias', 'var(--red)'); return; }
   const marca = document.getElementById('edit-marca').value;
   const nombre = document.getElementById('edit-nombre').value.trim();
   const color = document.getElementById('edit-color').value;
@@ -932,6 +935,7 @@ async function guardarEdicion(codigo) {
 }
 
 async function eliminarProducto(codigo) {
+  if (!esAdmin) { toast('Solo el administrador puede eliminar referencias', 'var(--red)'); return; }
   if (!confirm('¿Eliminar esta referencia del inventario?')) return;
   setSyncStatus('saving');
   try {
@@ -1004,8 +1008,8 @@ function renderInventario() {
         <div class="tallas-grid">${tallasAdultoHtml}</div>
         <div class="talla-actions">
           <button class="talla-btn sell" onclick="openModal('venta','${p.codigo}')">📤 Registrar venta</button>
-          <button class="talla-btn add" onclick="openModal('entrada','${p.codigo}')">📥 Agregar stock</button>
-          <button class="talla-btn" onclick="abrirEditar('${p.codigo}')" style="background:var(--purple-bg);border-color:rgba(124,92,252,0.2);color:var(--purple-text);">✏️ Editar</button>
+          ${esAdmin ? `<button class="talla-btn add" onclick="openModal('entrada','${p.codigo}')">📥 Agregar stock</button>` : ''}
+          ${esAdmin ? `<button class="talla-btn" onclick="abrirEditar('${p.codigo}')" style="background:var(--purple-bg);border-color:rgba(124,92,252,0.2);color:var(--purple-text);">✏️ Editar</button>` : ''}
         </div>
         ${p.costo || p.precio || p.precioDocena || p.precioCaja ? `<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
           ${p.costo ? `<div style="font-size:12px;color:var(--text3);">Costo: <span style="color:var(--text2);font-weight:600;">${fmt(p.costo)}</span></div>` : ''}
