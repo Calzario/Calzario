@@ -323,6 +323,9 @@ function aplicarPermisos() {
     if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('alertas')) {
       btn.style.display = esAdmin ? 'flex' : 'none';
     }
+    if (btn.getAttribute('onclick') && btn.getAttribute('onclick').includes('finanzas')) {
+      btn.style.display = esAdmin ? 'flex' : 'none';
+    }
   });
 }
 
@@ -335,6 +338,8 @@ db.collection('productos').onSnapshot(snap => {
   window._productos = snap.docs.map(d => d.data());
   if (typeof renderInventario === 'function') renderInventario();
   if (typeof updateHeader === 'function') updateHeader();
+  const secFin = document.getElementById('sec-finanzas');
+  if (secFin && secFin.classList.contains('active') && typeof renderFinanzas === 'function') renderFinanzas();
   setSyncStatus('ok');
 }, () => setSyncStatus('offline'));
 
@@ -343,6 +348,8 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
   window._movimientos = snap.docs.map(d => d.data());
   const sec = document.getElementById('sec-movimientos');
   if (sec && sec.classList.contains('active') && typeof renderMovimientos === 'function') renderMovimientos();
+  const secFin = document.getElementById('sec-finanzas');
+  if (secFin && secFin.classList.contains('active') && typeof renderFinanzas === 'function') renderFinanzas();
   setSyncStatus('ok');
 }, () => setSyncStatus('offline'));
 } // fin iniciarListeners
@@ -576,6 +583,66 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
   <div id="alertas-list"></div>
 </div>
 
+<!-- FINANZAS -->
+<div id="sec-finanzas" class="section">
+  <div class="sec-title">Finanzas</div>
+
+  <div class="kpi-grid">
+    <div class="kpi green full">
+      <div class="kl">Patrimonio en inventario</div>
+      <div class="kv" id="fin-patrimonio">$0</div>
+      <div class="ks">Costo total de los pares en bodega</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kl">Ganancia estimada</div>
+      <div class="kv" id="fin-ganancia-est">$0</div>
+      <div class="ks">$40.000 por par en bodega</div>
+    </div>
+    <div class="kpi amber">
+      <div class="kl">Pares en bodega</div>
+      <div class="kv" id="fin-pares">0</div>
+      <div class="ks">Stock actual total</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💰 Ganancia real acumulada en ventas</div>
+    <div class="form-grid" style="margin-bottom:10px;">
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Desde</label>
+        <input class="form-input" type="date" id="fin-desde" oninput="renderFinanzas()"/>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label class="form-label">Hasta</label>
+        <input class="form-input" type="date" id="fin-hasta" oninput="renderFinanzas()"/>
+      </div>
+    </div>
+    <button class="btn-secondary" style="margin-bottom:14px;" onclick="limpiarFechasFinanzas()">Ver todo el historial</button>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+      <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500;">Pares vendidos</div>
+        <div style="font-size:22px;font-weight:700;color:var(--green-text);" id="fin-pares-vendidos">0</div>
+      </div>
+      <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px;font-weight:500;">Ganancia real</div>
+        <div style="font-size:22px;font-weight:700;color:var(--amber-text);" id="fin-ganancia-real">$0</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px;">$40.000 × pares vendidos</div>
+      </div>
+    </div>
+
+    <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px;">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Desglose por período</div>
+      <div id="fin-desglose"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📊 Resumen por vendedor</div>
+    <div id="fin-por-vendedor"></div>
+  </div>
+</div>
+
 <!-- Bottom Nav -->
 <div class="bottom-nav">
   <button class="nav-btn active" onclick="showSection('inventario', this)">
@@ -589,6 +656,10 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
   <button class="nav-btn" onclick="showSection('movimientos', this)">
     <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
     Movimientos
+  </button>
+  <button class="nav-btn" onclick="showSection('finanzas', this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Finanzas
   </button>
   <button class="nav-btn" onclick="showSection('alertas', this)">
     <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -711,6 +782,7 @@ function showSection(id, btn) {
   if (id === 'inventario') renderInventario();
   if (id === 'movimientos') renderMovimientos();
   if (id === 'alertas') renderAlertas();
+  if (id === 'finanzas') renderFinanzas();
   if (id === 'agregar') initAgregarForm();
   updateHeader();
 }
@@ -1099,10 +1171,29 @@ function openModal(tipo, codigo) {
     <div style="font-size:13px;color:var(--text2);margin-bottom:14px;">${prod.marca} ${prod.nombre} · ${prod.color}</div>
     ${buildTallaInputs(TALLAS_NINO, '👦 Niño (EUR 28–35)')}
     ${buildTallaInputs(TALLAS_ADULTO, '👟 Adulto (EUR 36–45)')}
-    <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+    <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:${tipo === 'venta' ? '10px' : '14px'};">
       <span style="font-size:13px;color:var(--text2);font-weight:600;">Total pares seleccionados</span>
       <span id="modal-total" style="font-size:22px;font-weight:700;color:var(--green-text);">0</span>
     </div>
+    ${tipo === 'venta' ? `
+    <div style="background:var(--card2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;">
+      <div style="font-size:12px;color:var(--text2);font-weight:600;margin-bottom:10px;">💰 Precio de venta</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px;">
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:5px;">Precio por par ($COP)</div>
+          <input class="form-input" id="modal-precio-par" type="number" inputmode="numeric" placeholder="145000" oninput="recalcPrecio()"/>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--text3);margin-bottom:5px;">Total venta ($COP)</div>
+          <input class="form-input" id="modal-precio-total" type="number" inputmode="numeric" placeholder="0" oninput="recalcPrecioDesdeToral()"/>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding-top:8px;border-top:0.5px solid var(--border);">
+        <span style="font-size:12px;color:var(--text3);">Ganancia estimada</span>
+        <span id="modal-ganancia" style="font-size:14px;font-weight:700;color:var(--amber-text);">$0</span>
+      </div>
+    </div>
+    ` : ''}
     <button class="btn-primary" id="modal-confirm-btn" onclick="confirmarMovimiento()" style="background:${tipo === 'venta' ? 'var(--green)' : 'var(--blue)'};" disabled>
       ${tipo === 'venta' ? 'Confirmar venta' : 'Agregar al inventario'}
     </button>
@@ -1119,6 +1210,43 @@ function recalcTotal() {
   document.getElementById('modal-total').textContent = total;
   const btn = document.getElementById('modal-confirm-btn');
   if (btn) btn.disabled = total === 0;
+  recalcPrecio();
+}
+
+function recalcPrecio() {
+  const total = parseInt(document.getElementById('modal-total')?.textContent) || 0;
+  const precioPar = parseFloat(document.getElementById('modal-precio-par')?.value) || 0;
+  if (precioPar > 0 && total > 0) {
+    const totalVenta = precioPar * total;
+    const inp = document.getElementById('modal-precio-total');
+    if (inp) inp.value = totalVenta;
+  }
+  actualizarGananciaModal();
+}
+
+function recalcPrecioDesdeToral() {
+  const total = parseInt(document.getElementById('modal-total')?.textContent) || 0;
+  const totalVenta = parseFloat(document.getElementById('modal-precio-total')?.value) || 0;
+  if (total > 0 && totalVenta > 0) {
+    const inp = document.getElementById('modal-precio-par');
+    if (inp) inp.value = Math.round(totalVenta / total);
+  }
+  actualizarGananciaModal();
+}
+
+function actualizarGananciaModal() {
+  const total = parseInt(document.getElementById('modal-total')?.textContent) || 0;
+  const totalVenta = parseFloat(document.getElementById('modal-precio-total')?.value) || 0;
+  const ganEl = document.getElementById('modal-ganancia');
+  if (!ganEl) return;
+  const ganancia = totalVenta - (total * GANANCIA_PAR);
+  ganEl.textContent = fmtFull(totalVenta > 0 ? totalVenta - (total * 0) : total * GANANCIA_PAR);
+  // Mostrar ganancia real si hay precio total
+  if (totalVenta > 0) {
+    const gananciaPorPar = total > 0 ? Math.round(totalVenta / total) - GANANCIA_PAR : 0;
+    ganEl.textContent = fmtFull(totalVenta);
+    ganEl.style.color = gananciaPorPar >= 0 ? 'var(--amber-text)' : 'var(--red-text)';
+  }
 }
 
 async function confirmarMovimiento() {
@@ -1161,12 +1289,20 @@ async function confirmarMovimiento() {
     const userEmail = currentUser ? currentUser.email : 'desconocido';
     const userName = userEmail.split('@')[0];
 
+    // Capturar precio si es venta
+    const precioPar = tipo === 'venta' ? (parseFloat(document.getElementById('modal-precio-par')?.value) || 0) : 0;
+    const precioTotal = tipo === 'venta' ? (parseFloat(document.getElementById('modal-precio-total')?.value) || 0) : 0;
+    const gananciaNeta = precioTotal > 0 ? precioTotal - (totalPares * GANANCIA_PAR) : totalPares * GANANCIA_PAR;
+
     await db.collection('movimientos').add({
       tipo, codigo,
       nombre: `${prod.marca} ${prod.nombre}`,
       color: prod.color,
       talla: tallasDetalle,
       pares: totalPares,
+      precioPar,
+      precioTotal,
+      gananciaNeta,
       fecha: new Date().toLocaleDateString('es-CO'),
       hora: new Date().toLocaleTimeString('es-CO', {hour:'2-digit',minute:'2-digit'}),
       ts: Date.now(),
@@ -1310,6 +1446,166 @@ function renderMovimientos() {
 }
 
 // ── ALERTAS ────────────────────────────────────────────────
+// ── FINANZAS ───────────────────────────────────────────────
+const GANANCIA_PAR = 40000;
+
+function limpiarFechasFinanzas() {
+  document.getElementById('fin-desde').value = '';
+  document.getElementById('fin-hasta').value = '';
+  renderFinanzas();
+}
+
+function renderFinanzas() {
+  const { productos, movimientos } = getData();
+
+  // ── PATRIMONIO EN BODEGA ──────────────────────────────
+  let totalParesBodega = 0;
+  let totalCosto = 0;
+  productos.forEach(p => {
+    const pares = stockTotal(p);
+    totalParesBodega += pares;
+    totalCosto += pares * (p.costo || 0);
+  });
+  const gananciaBodegaEst = totalParesBodega * GANANCIA_PAR;
+
+  document.getElementById('fin-patrimonio').textContent = fmtFull(totalCosto);
+  document.getElementById('fin-ganancia-est').textContent = fmtFull(gananciaBodegaEst);
+  document.getElementById('fin-pares').textContent = totalParesBodega;
+
+  // ── FILTRO FECHAS ─────────────────────────────────────
+  const desdeStr = document.getElementById('fin-desde')?.value;
+  const hastaStr = document.getElementById('fin-hasta')?.value;
+  const desde = desdeStr ? parseFechaLocal(desdeStr) : null;
+  const hasta = hastaStr ? parseFechaLocal(hastaStr) : null;
+  if (hasta) hasta.setHours(23, 59, 59);
+
+  const ventas = movimientos.filter(m => {
+    if (m.tipo !== 'venta') return false;
+    if (!desde && !hasta) return true;
+    const fecha = parseFechaLocal(m.fecha);
+    if (!fecha) return true;
+    if (desde && fecha < desde) return false;
+    if (hasta && fecha > hasta) return false;
+    return true;
+  });
+
+  const totalVendidos = ventas.reduce((a, m) => a + m.pares, 0);
+  const gananciaReal = ventas.reduce((a, m) => {
+    if (m.precioTotal && m.precioTotal > 0) return a + m.precioTotal;
+    return a + (m.pares * GANANCIA_PAR);
+  }, 0);
+  const gananciaMeta = totalVendidos * GANANCIA_PAR;
+  const precioPorParReal = totalVendidos > 0 ? Math.round(gananciaReal / totalVendidos) : 0;
+  const diferencia = gananciaReal - gananciaMeta;
+  const pctVsMeta = gananciaMeta > 0 ? Math.round((gananciaReal / gananciaMeta) * 100) : 0;
+  const estaBien = gananciaReal >= gananciaMeta;
+
+  document.getElementById('fin-pares-vendidos').textContent = totalVendidos;
+  document.getElementById('fin-ganancia-real').textContent = fmtFull(gananciaReal);
+
+  // ── INDICADOR VS META ─────────────────────────────────
+  const desgloseEl = document.getElementById('fin-desglose');
+
+  // Performance card
+  const perfHTML = totalVendidos > 0 ? `
+    <div style="background:${estaBien ? 'var(--green-bg)' : 'var(--red-bg)'};border:1px solid ${estaBien ? 'var(--green-border)' : 'rgba(224,68,68,0.2)'};border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${estaBien ? '✅ Por encima del promedio' : '⚠️ Por debajo del promedio'}</span>
+        <span style="font-size:16px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${pctVsMeta}%</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--text3);">Meta ($40K/par)</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text2);">${fmtFull(gananciaMeta)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--text3);">Real obtenido</div>
+          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${fmtFull(gananciaReal)}</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:11px;color:var(--text3);">Diferencia</div>
+          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${diferencia >= 0 ? '+' : ''}${fmtFull(diferencia)}</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid ${estaBien ? 'rgba(27,175,122,0.2)' : 'rgba(224,68,68,0.2)'};">
+        <div style="font-size:11px;color:var(--text3);">Precio promedio real por par: <strong style="color:var(--text2);">${fmtFull(precioPorParReal)}</strong> ${precioPorParReal >= GANANCIA_PAR ? '✅' : '⚠️ Ajusta precios'}</div>
+      </div>
+    </div>` : '';
+
+  // ── DESGLOSE POR DÍA ──────────────────────────────────
+  if (ventas.length === 0) {
+    desgloseEl.innerHTML = perfHTML + '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px 0;">Sin ventas en este período</div>';
+  } else {
+    const porFecha = {};
+    ventas.forEach(m => {
+      if (!porFecha[m.fecha]) porFecha[m.fecha] = { pares: 0, ingreso: 0 };
+      porFecha[m.fecha].pares += m.pares;
+      porFecha[m.fecha].ingreso += m.precioTotal || (m.pares * GANANCIA_PAR);
+    });
+    const fechasOrdenadas = Object.keys(porFecha).sort((a, b) => {
+      return (parseFechaLocal(b) || 0) - (parseFechaLocal(a) || 0);
+    });
+    desgloseEl.innerHTML = perfHTML + fechasOrdenadas.slice(0, 30).map(f => {
+      const metaDia = porFecha[f].pares * GANANCIA_PAR;
+      const realDia = porFecha[f].ingreso;
+      const bienDia = realDia >= metaDia;
+      return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border);">
+        <div>
+          <div style="font-size:13px;color:var(--text);">${f}</div>
+          <div style="font-size:11px;color:var(--text3);">${porFecha[f].pares} pares · ${bienDia ? '✅' : '⚠️'} ${bienDia ? 'Sobre meta' : 'Bajo meta'}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:14px;font-weight:700;color:${bienDia ? 'var(--amber-text)' : 'var(--red-text)'};">${fmtFull(realDia)}</div>
+          <div style="font-size:11px;color:var(--text3);">meta: ${fmtFull(metaDia)}</div>
+        </div>
+      </div>`;
+    }).join('') + `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;">
+        <span style="font-size:13px;font-weight:600;color:var(--text2);">Total período</span>
+        <span style="font-size:16px;font-weight:700;color:${estaBien ? 'var(--amber-text)' : 'var(--red-text)'};">${fmtFull(gananciaReal)}</span>
+      </div>`;
+  }
+
+  // ── POR VENDEDOR ──────────────────────────────────────
+  const porVendedor = {};
+  ventas.forEach(m => {
+    const nombre = m.usuarioNombre || m.usuario || 'Sin identificar';
+    if (!porVendedor[nombre]) porVendedor[nombre] = { pares: 0, ingreso: 0, meta: 0 };
+    porVendedor[nombre].pares += m.pares;
+    porVendedor[nombre].ingreso += m.precioTotal || (m.pares * GANANCIA_PAR);
+    porVendedor[nombre].meta += m.pares * GANANCIA_PAR;
+  });
+
+  const vendedorEl = document.getElementById('fin-por-vendedor');
+  const vendedores = Object.entries(porVendedor).sort((a, b) => b[1].pares - a[1].pares);
+
+  if (vendedores.length === 0) {
+    vendedorEl.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px 0;">Sin datos en este período</div>';
+  } else {
+    vendedorEl.innerHTML = vendedores.map(([nombre, data]) => {
+      const bien = data.ingreso >= data.meta;
+      const pct = data.meta > 0 ? Math.round((data.ingreso / data.meta) * 100) : 100;
+      return `
+      <div style="padding:12px 0;border-bottom:0.5px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--text);">👤 ${nombre}</div>
+            <div style="font-size:11px;color:var(--text3);">${data.pares} pares · ${bien ? '✅ Sobre meta' : '⚠️ Bajo meta'}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:14px;font-weight:700;color:${bien ? 'var(--green-text)' : 'var(--red-text)'};">${fmtFull(data.ingreso)}</div>
+            <div style="font-size:11px;color:var(--text3);">${pct}% de meta</div>
+          </div>
+        </div>
+        <div style="background:var(--card2);border-radius:99px;height:5px;overflow:hidden;">
+          <div style="height:100%;border-radius:99px;background:${bien ? 'var(--green)' : 'var(--red)'};width:${Math.min(100,pct)}%;transition:width 0.3s;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
 function renderAlertas() {
   const { productos } = getData();
   const list = document.getElementById('alertas-list');
