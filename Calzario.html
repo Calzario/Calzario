@@ -1246,11 +1246,11 @@ function actualizarGananciaModal() {
   const ganEl = document.getElementById('modal-ganancia');
   if (!ganEl) return;
   const ganancia = totalVenta - (total * GANANCIA_PAR);
-  ganEl.textContent = fmtFull(totalVenta > 0 ? totalVenta - (total * 0) : total * GANANCIA_PAR);
+  ganEl.textContent = fmt(totalVenta > 0 ? totalVenta - (total * 0) : total * GANANCIA_PAR);
   // Mostrar ganancia real si hay precio total
   if (totalVenta > 0) {
     const gananciaPorPar = total > 0 ? Math.round(totalVenta / total) - GANANCIA_PAR : 0;
-    ganEl.textContent = fmtFull(totalVenta);
+    ganEl.textContent = fmt(totalVenta);
     ganEl.style.color = gananciaPorPar >= 0 ? 'var(--amber-text)' : 'var(--red-text)';
   }
 }
@@ -1483,8 +1483,8 @@ function renderFinanzas() {
   });
   const gananciaBodegaEst = totalParesBodega * GANANCIA_PAR;
 
-  document.getElementById('fin-patrimonio').textContent = fmtFull(totalCosto);
-  document.getElementById('fin-ganancia-est').textContent = fmtFull(gananciaBodegaEst);
+  document.getElementById('fin-patrimonio').textContent = fmt(totalCosto);
+  document.getElementById('fin-ganancia-est').textContent = fmt(gananciaBodegaEst);
   document.getElementById('fin-pares').textContent = totalParesBodega;
 
   // ── FILTRO FECHAS ─────────────────────────────────────
@@ -1516,7 +1516,7 @@ function renderFinanzas() {
   const estaBien = gananciaReal >= gananciaMeta;
 
   document.getElementById('fin-pares-vendidos').textContent = totalVendidos;
-  document.getElementById('fin-ganancia-real').textContent = fmtFull(gananciaReal);
+  document.getElementById('fin-ganancia-real').textContent = fmt(gananciaReal);
 
   // ── INDICADOR VS META ─────────────────────────────────
   const desgloseEl = document.getElementById('fin-desglose');
@@ -1531,19 +1531,19 @@ function renderFinanzas() {
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
         <div style="text-align:center;">
           <div style="font-size:11px;color:var(--text3);">Meta ($40K/par)</div>
-          <div style="font-size:13px;font-weight:700;color:var(--text2);">${fmtFull(gananciaMeta)}</div>
+          <div style="font-size:13px;font-weight:700;color:var(--text2);">${fmt(gananciaMeta)}</div>
         </div>
         <div style="text-align:center;">
           <div style="font-size:11px;color:var(--text3);">Real obtenido</div>
-          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${fmtFull(gananciaReal)}</div>
+          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${fmt(gananciaReal)}</div>
         </div>
         <div style="text-align:center;">
           <div style="font-size:11px;color:var(--text3);">Diferencia</div>
-          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${diferencia >= 0 ? '+' : ''}${fmtFull(diferencia)}</div>
+          <div style="font-size:13px;font-weight:700;color:${estaBien ? 'var(--green-text)' : 'var(--red-text)'};">${diferencia >= 0 ? '+' : ''}${fmt(diferencia)}</div>
         </div>
       </div>
       <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid ${estaBien ? 'rgba(27,175,122,0.2)' : 'rgba(224,68,68,0.2)'};">
-        <div style="font-size:11px;color:var(--text3);">Precio promedio real por par: <strong style="color:var(--text2);">${fmtFull(precioPorParReal)}</strong> ${precioPorParReal >= GANANCIA_PAR ? '✅' : '⚠️ Ajusta precios'}</div>
+        <div style="font-size:11px;color:var(--text3);">Precio promedio real por par: <strong style="color:var(--text2);">${fmt(precioPorParReal)}</strong> ${precioPorParReal >= GANANCIA_PAR ? '✅' : '⚠️ Ajusta precios'}</div>
       </div>
     </div>` : '';
 
@@ -1571,14 +1571,14 @@ function renderFinanzas() {
           <div style="font-size:11px;color:var(--text3);">${porFecha[f].pares} pares · ${bienDia ? '✅' : '⚠️'} ${bienDia ? 'Sobre meta' : 'Bajo meta'}</div>
         </div>
         <div style="text-align:right;">
-          <div style="font-size:14px;font-weight:700;color:${bienDia ? 'var(--amber-text)' : 'var(--red-text)'};">${fmtFull(realDia)}</div>
-          <div style="font-size:11px;color:var(--text3);">meta: ${fmtFull(metaDia)}</div>
+          <div style="font-size:14px;font-weight:700;color:${bienDia ? 'var(--amber-text)' : 'var(--red-text)'};">${fmt(realDia)}</div>
+          <div style="font-size:11px;color:var(--text3);">meta: ${fmt(metaDia)}</div>
         </div>
       </div>`;
     }).join('') + `
       <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;">
         <span style="font-size:13px;font-weight:600;color:var(--text2);">Total período</span>
-        <span style="font-size:16px;font-weight:700;color:${estaBien ? 'var(--amber-text)' : 'var(--red-text)'};">${fmtFull(gananciaReal)}</span>
+        <span style="font-size:16px;font-weight:700;color:${estaBien ? 'var(--amber-text)' : 'var(--red-text)'};">${fmt(gananciaReal)}</span>
       </div>`;
   }
 
@@ -1609,7 +1609,7 @@ function renderFinanzas() {
             <div style="font-size:11px;color:var(--text3);">${data.pares} pares · ${bien ? '✅ Sobre meta' : '⚠️ Bajo meta'}</div>
           </div>
           <div style="text-align:right;">
-            <div style="font-size:14px;font-weight:700;color:${bien ? 'var(--green-text)' : 'var(--red-text)'};">${fmtFull(data.ingreso)}</div>
+            <div style="font-size:14px;font-weight:700;color:${bien ? 'var(--green-text)' : 'var(--red-text)'};">${fmt(data.ingreso)}</div>
             <div style="font-size:11px;color:var(--text3);">${pct}% de meta</div>
           </div>
         </div>
