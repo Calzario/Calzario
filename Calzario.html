@@ -338,8 +338,11 @@ db.collection('productos').onSnapshot(snap => {
   window._productos = snap.docs.map(d => d.data());
   if (typeof renderInventario === 'function') renderInventario();
   if (typeof updateHeader === 'function') updateHeader();
-  const secFin = document.getElementById('sec-finanzas');
-  if (secFin && secFin.classList.contains('active') && typeof renderFinanzas === 'function') renderFinanzas();
+  // Siempre actualizar finanzas aunque no esté visible
+  if (typeof renderFinanzas === 'function') {
+    const secFin = document.getElementById('sec-finanzas');
+    if (secFin && secFin.classList.contains('active')) renderFinanzas();
+  }
   setSyncStatus('ok');
 }, () => setSyncStatus('offline'));
 
@@ -348,8 +351,10 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
   window._movimientos = snap.docs.map(d => d.data());
   const sec = document.getElementById('sec-movimientos');
   if (sec && sec.classList.contains('active') && typeof renderMovimientos === 'function') renderMovimientos();
-  const secFin = document.getElementById('sec-finanzas');
-  if (secFin && secFin.classList.contains('active') && typeof renderFinanzas === 'function') renderFinanzas();
+  if (typeof renderFinanzas === 'function') {
+    const secFin = document.getElementById('sec-finanzas');
+    if (secFin && secFin.classList.contains('active')) renderFinanzas();
+  }
   setSyncStatus('ok');
 }, () => setSyncStatus('offline'));
 } // fin iniciarListeners
@@ -782,7 +787,7 @@ function showSection(id, btn) {
   if (id === 'inventario') renderInventario();
   if (id === 'movimientos') renderMovimientos();
   if (id === 'alertas') renderAlertas();
-  if (id === 'finanzas') renderFinanzas();
+  if (id === 'finanzas') { renderFinanzas(); }
   if (id === 'agregar') initAgregarForm();
   updateHeader();
 }
@@ -1457,15 +1462,24 @@ function limpiarFechasFinanzas() {
 }
 
 function renderFinanzas() {
-  const { productos, movimientos } = getData();
+  const productos = window._productos || [];
+  const movimientos = window._movimientos || [];
+
+  // Debug temporal
+  console.log('renderFinanzas: productos=', productos.length, 'movimientos=', movimientos.length);
+  if (productos.length > 0) console.log('primer producto:', JSON.stringify(productos[0]).substring(0, 200));
 
   // ── PATRIMONIO EN BODEGA ──────────────────────────────
   let totalParesBodega = 0;
   let totalCosto = 0;
   productos.forEach(p => {
-    const pares = stockTotal(p);
+    if (!p || !p.tallas) return;
+    const pares = TALLAS.reduce((a, t) => {
+      const v = p.tallas[t] !== undefined ? p.tallas[t] : (p.tallas[String(t)] !== undefined ? p.tallas[String(t)] : 0);
+      return a + (parseInt(v) || 0);
+    }, 0);
     totalParesBodega += pares;
-    totalCosto += pares * (p.costo || 0);
+    totalCosto += pares * (parseFloat(p.costo) || 0);
   });
   const gananciaBodegaEst = totalParesBodega * GANANCIA_PAR;
 
