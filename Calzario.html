@@ -643,6 +643,11 @@ db.collection('movimientos').orderBy('ts', 'desc').limit(200).onSnapshot(snap =>
   </div>
 
   <div class="card">
+    <div class="card-title">🧾 Detalle de ventas · cuadre de caja</div>
+    <div id="fin-detalle-ventas"></div>
+  </div>
+
+  <div class="card">
     <div class="card-title">📊 Resumen por vendedor</div>
     <div id="fin-por-vendedor"></div>
   </div>
@@ -1418,12 +1423,13 @@ function renderMovimientos() {
   function renderLista(tipo, containerId, titleId) {
     const lista = filtrados.filter(m => m.tipo === tipo);
     const totalPares = lista.reduce((a, m) => a + m.pares, 0);
+    const totalIngresos = lista.reduce((a, m) => a + (m.precioTotal || 0), 0);
     const container = document.getElementById(containerId);
     const title = document.getElementById(titleId);
 
     if (title) title.textContent = tipo === 'entrada'
       ? `Entradas · ${lista.length} registros · ${totalPares} pares`
-      : `Salidas · ${lista.length} registros · ${totalPares} pares`;
+      : `Salidas · ${lista.length} registros · ${totalPares} pares${totalIngresos > 0 ? ' · ' + fmt(totalIngresos) : ''}`;
 
     if (lista.length === 0) {
       container.innerHTML = `<div class="empty" style="padding:20px 0;"><div class="empty-icon">${tipo === 'entrada' ? '📥' : '📤'}</div>Sin ${tipo === 'entrada' ? 'entradas' : 'salidas'} en este período</div>`;
@@ -1435,14 +1441,22 @@ function renderMovimientos() {
         <div class="mov-info">
           <div class="mov-name">${m.nombre} · ${m.color}</div>
           <div class="mov-detail">${m.fecha} ${m.hora || ''} ${m.talla ? '· ' + m.talla : ''} · Ref: ${m.codigo}</div>
+          ${tipo === 'venta' && m.precioTotal ? `<div style="font-size:12px;color:var(--amber-text);margin-top:3px;font-weight:600;">💰 ${fmt(m.precioTotal)} · $${Math.round((m.precioTotal||0)/(m.pares||1)).toLocaleString('es-CO')}/par</div>` : ''}
           ${m.usuarioNombre ? `<div style="font-size:11px;color:var(--purple-text);margin-top:2px;font-weight:600;">👤 ${m.usuarioNombre}</div>` : ''}
         </div>
         <div class="mov-amount ${tipo === 'venta' ? 'out' : 'in'}">${tipo === 'venta' ? '-' : '+'}${m.pares}p</div>
       </div>
     `).join('') + `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0 0;border-top:1px solid var(--border);margin-top:4px;">
-        <span style="font-size:12px;color:var(--text3);">Total período</span>
-        <span style="font-size:16px;font-weight:700;color:${tipo === 'venta' ? 'var(--red-text)' : 'var(--green-text)'}">${tipo === 'venta' ? '-' : '+'}${totalPares} pares</span>
+      <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;${tipo === 'venta' && totalIngresos > 0 ? 'margin-bottom:6px;' : ''}">
+          <span style="font-size:12px;color:var(--text3);">Total pares</span>
+          <span style="font-size:16px;font-weight:700;color:${tipo === 'venta' ? 'var(--red-text)' : 'var(--green-text)'};">${tipo === 'venta' ? '-' : '+'}${totalPares} pares</span>
+        </div>
+        ${tipo === 'venta' && totalIngresos > 0 ? `
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;color:var(--text3);">Total ingresos del período</span>
+          <span style="font-size:16px;font-weight:700;color:var(--amber-text);">${fmt(totalIngresos)}</span>
+        </div>` : ''}
       </div>
     `;
   }
@@ -1594,6 +1608,37 @@ function renderFinanzas() {
 
   const vendedorEl = document.getElementById('fin-por-vendedor');
   const vendedores = Object.entries(porVendedor).sort((a, b) => b[1].pares - a[1].pares);
+
+  // ── DETALLE DE VENTAS · CUADRE DE CAJA ───────────────
+  const detalleEl = document.getElementById('fin-detalle-ventas');
+  if (detalleEl) {
+    if (ventas.length === 0) {
+      detalleEl.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px 0;">Sin ventas en este período</div>';
+    } else {
+      const totalEfectivo = ventas.reduce((a, m) => a + (m.precioTotal || 0), 0);
+      detalleEl.innerHTML = ventas.map((m, i) => `
+        <div style="padding:10px 0;border-bottom:0.5px solid var(--border);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="flex:1;">
+              <div style="font-size:13px;font-weight:600;color:var(--text);">${m.nombre} · ${m.color}</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px;">${m.fecha} ${m.hora || ''} · ${m.pares} pares · ${m.talla || ''}</div>
+              ${m.usuarioNombre ? `<div style="font-size:11px;color:var(--purple-text);margin-top:2px;">👤 ${m.usuarioNombre}</div>` : ''}
+            </div>
+            <div style="text-align:right;flex-shrink:0;margin-left:10px;">
+              ${m.precioTotal ? `<div style="font-size:14px;font-weight:700;color:var(--amber-text);">${fmt(m.precioTotal)}</div>
+              <div style="font-size:11px;color:var(--text3);">$${Math.round(m.precioTotal/m.pares).toLocaleString('es-CO')}/par</div>` : '<div style="font-size:12px;color:var(--text3);">Sin precio</div>'}
+            </div>
+          </div>
+        </div>`).join('') + `
+        <div style="padding:12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:12px;color:var(--text3);">Total en caja</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px;">${ventas.length} ventas · ${ventas.reduce((a,m)=>a+m.pares,0)} pares</div>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:var(--amber-text);">${fmt(totalEfectivo)}</div>
+        </div>`;
+    }
+  }
 
   if (vendedores.length === 0) {
     vendedorEl.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:12px 0;">Sin datos en este período</div>';
